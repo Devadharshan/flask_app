@@ -109,3 +109,88 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sybase Server Info</title>
+    <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
+</head>
+<body>
+    <h1>Sybase Server Information</h1>
+    <div>
+        <canvas id="cpuGauge" width="150" height="150"></canvas>
+        <canvas id="memoryGauge" width="150" height="150"></canvas>
+    </div>
+    <hr>
+    <h2>Select Database</h2>
+    <form action="/database_info" method="post">
+        <label for="server">Select Server:</label>
+        <select id="server" name="server">
+            <option value="sybase_server_1">Sybase Server 1</option>
+            <option value="sybase_server_2">Sybase Server 2</option>
+        </select><br><br>
+        <label for="database">Select Database:</label>
+        <input type="text" id="database" name="database" required><br><br>
+        <input type="submit" value="Get Database Info">
+    </form>
+    <button id="checkBlockingBtn">Check Blocking</button>
+    <div id="blockingInfo"></div>
+
+    <script>
+        document.getElementById('checkBlockingBtn').addEventListener('click', function() {
+            fetch('/check_blocking', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    const blockingInfo = document.getElementById('blockingInfo');
+                    if (data.message) {
+                        blockingInfo.innerHTML = `<p>${data.message}</p>`;
+                    } else {
+                        blockingInfo.innerHTML = '<ul>' + data.blocking_processes.map(proc => 
+                            `<li>SPID: ${proc[0]}, Blocked: ${proc[1]}</li>`).join('') + '</ul>';
+                    }
+                });
+        });
+
+        const ctxCpu = document.getElementById('cpuGauge').getContext('2d');
+        const cpuGauge = new Chart(ctxCpu, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: [{{ server_info.cpu_usage }}, 100 - {{ server_info.cpu_usage }}],
+                    backgroundColor: ['#ff6384', '#e0e0e0']
+                }],
+                labels: ['CPU Usage', '']
+            },
+            options: {
+                circumference: Math.PI,
+                rotation: Math.PI,
+                cutout: '70%'
+            }
+        });
+
+        const ctxMemory = document.getElementById('memoryGauge').getContext('2d');
+        const memoryGauge = new Chart(ctxMemory, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: [{{ server_info.memory_usage }}, 100 - {{ server_info.memory_usage }}],
+                    backgroundColor: ['#36a2eb', '#e0e0e0']
+                }],
+                labels: ['Memory Usage', '']
+            },
+            options: {
+                circumference: Math.PI,
+                rotation: Math.PI,
+                cutout: '70%'
+            }
+        });
+    </script>
+</body>
+</html>
