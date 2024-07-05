@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sybase Server Info</title>
+</head>
+<body>
+    <h1>Sybase Server Information</h1>
+    <div>
+        <h3>Server CPU Usage: {{ server_info.cpu_usage }}</h3>
+        <h3>Server Memory Usage: {{ server_info.memory_usage }}</h3>
+    </div>
+    <hr>
+    <h2>Select Database</h2>
+    <form action="/database_info" method="post">
+        <label for="server">Select Server:</label>
+        <select id="server" name="server">
+            <option value="sybase_server_1">Sybase Server 1</option>
+            <option value="sybase_server_2">Sybase Server 2</option>
+            <!-- Add more options as needed -->
+        </select><br><br>
+        <label for="database">Select Database:</label>
+        <input type="text" id="database" name="database" required><br><br>
+        <input type="submit" value="Get Database Info">
+    </form>
+</body>
+</html>
