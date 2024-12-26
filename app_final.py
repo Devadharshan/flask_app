@@ -1,3 +1,74 @@
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.metrics import get_meter
+from lib.tracer import tracer_init  # Assuming you have tracer_init here
+from lib.logger import log  # Assuming you have log setup in logger.py
+import time
+import psutil  # For CPU and memory metrics
+
+
+# 1. Initialize Tracer from your existing `lib.tracer`
+tracer = tracer_init()  # Initialize tracer (ensure it's using your OpenTelemetry configuration)
+
+# 2. Configure OpenTelemetry Metric Exporter
+resource = Resource.create({"service.name": "test_python_app"})  # Add labels like `test_python_app`
+
+metric_exporter = OTLPMetricExporter(
+    endpoint="http://<collector_address>:5608",  # Replace with your OTLP collector endpoint
+    insecure=True,  # Set to False if your endpoint uses TLS
+)
+
+metric_reader = PeriodicExportingMetricReader(exporter=metric_exporter, export_interval_millis=5000)
+
+meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+meter = get_meter("test_python_app", meter_provider=meter_provider)
+
+# 3. Define Custom Metrics (e.g., CPU, Memory)
+cpu_usage = meter.create_observable_gauge(
+    "app.cpu.usage",
+    callbacks=[lambda: [psutil.cpu_percent()]],
+    description="CPU usage of the application",
+)
+
+memory_usage = meter.create_observable_gauge(
+    "app.memory.usage",
+    callbacks=[lambda: [psutil.virtual_memory().percent]],
+    description="Memory usage of the application",
+)
+
+custom_requests_counter = meter.create_counter(
+    "app.custom.requests",
+    description="Number of custom requests processed",
+)
+
+
+# 4. Sample Function to Trace and Log
+def main():
+    with tracer.start_as_current_span("main-operation", attributes={"operation": "demo"}):
+        log.info("Starting the main operation")
+        # Simulate work
+        time.sleep(1)
+        # Increment custom counter
+        custom_requests_counter.add(1, {"endpoint": "/demo"})
+
+        log.info("Main operation completed successfully")
+
+
+# 5. Run Application Loop
+if __name__ == "__main__":
+    log.info("Starting Python application with OpenTelemetry metrics and tracing")
+    while True:
+        try:
+            main()
+        except Exception as e:
+            log.error(f"An error occurred: {e}")
+        time.sleep(5)
+
+
+
+----
 pip install opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-api
 pip uninstall opentelemetry-exporter-otlp -y
 pip install opentelemetry-exporter-otlp
