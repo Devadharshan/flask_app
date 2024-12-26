@@ -1,3 +1,6 @@
+#pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp psutil sybpydb
+
+
 import sybpydb
 import logging
 import psutil
