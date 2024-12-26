@@ -1,4 +1,6 @@
 pip install opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-api
+pip uninstall opentelemetry-exporter-otlp -y
+pip install opentelemetry-exporter-otlp
 
 
 from opentelemetry.exporter.otlp.trace import OTLPTraceExporter
