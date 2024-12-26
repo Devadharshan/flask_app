@@ -332,3 +332,123 @@ if __name__ == "__main__":
         time.sleep(300)  # Run every 5 minutes
 
 
+
+
+0--------
+
+
+import sybpydb
+import psutil
+import time
+from lib.trace import tracer_init  # Your custom tracing setup
+from lib.logger import log  # Assuming `log` is your logging instance from lib.logger
+from opentelemetry import trace
+from opentelemetry.metrics import get_meter_provider, Observation
+
+# Initialize OpenTelemetry Tracing and Metrics
+try:
+    tracer_init()  # Custom tracing setup (configured in your `lib/trace.py`)
+    meter = get_meter_provider().get_meter("sybase_otel_cert_monitor")
+    log.info("OpenTelemetry metrics and tracing initialized successfully.")
+except Exception as e:
+    log.error(f"Failed to initialize OpenTelemetry: {e}")
+    raise
+
+# Define metrics with labels
+cpu_usage_metric = meter.create_up_down_counter(
+    name="app_cpu_usage",
+    description="CPU usage of the application",
+    unit="%",
+)
+
+memory_usage_metric = meter.create_up_down_counter(
+    name="app_memory_usage",
+    description="Memory usage of the application",
+    unit="%",
+)
+
+# Configure Sybase connection
+DB_SERVER = "your_sybase_server"
+DATABASE_NAME = "your_database_name"
+
+
+def connect_to_sybase():
+    """
+    Establish a connection to the Sybase database using sybpydb.
+    """
+    try:
+        conn = sybpydb.connect(dsn=f"server name={DB_SERVER}; database={DATABASE_NAME}; chainxacts=0")
+        log.info("Successfully connected to the Sybase database")
+        return conn
+    except Exception as e:
+        log.error(f"Error connecting to Sybase: {e}")
+        raise
+
+
+def execute_query(query: str):
+    """
+    Execute a query on the Sybase database and return the results.
+    """
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span(
+        "execute_query", attributes={"query": query}
+    ) as span:
+        try:
+            conn = connect_to_sybase()
+            cursor = conn.cursor()
+            log.info(f"Executing query: {query}")
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            span.set_attribute("query_result_count", len(rows))
+            log.info("Query executed successfully")
+            return rows
+        except Exception as e:
+            log.error(f"Error executing query: {e}")
+            raise
+
+
+def report_metrics():
+    """
+    Report system-level metrics (CPU and memory usage).
+    """
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("report_metrics"):
+        try:
+            cpu_usage = psutil.cpu_percent()
+            memory_usage = psutil.virtual_memory().percent
+
+            # Add metrics with labels
+            cpu_usage_metric.add(cpu_usage, {"app_name": "test_python_app"})
+            memory_usage_metric.add(memory_usage, {"app_name": "test_python_app"})
+
+            log.info(f"CPU Usage: {cpu_usage}%, Memory Usage: {memory_usage}%")
+        except Exception as e:
+            log.error(f"Error reporting metrics: {e}")
+
+
+def main():
+    """
+    Main function to execute a Sybase query and send metrics.
+    """
+    query = "SELECT TOP 10 * FROM your_table_name"  # Replace with your query
+    try:
+        # Collect and report metrics
+        report_metrics()
+
+        # Execute database query
+        log.info("Executing database query")
+        results = execute_query(query)
+        log.info(f"Query Results: {results}")
+
+    except Exception as e:
+        log.error("Failed to execute main process", exc_info=True)
+
+
+if __name__ == "__main__":
+    while True:
+        main()
+        time.sleep(300)  # Run every 5 minutes
+
+
