@@ -1,3 +1,13 @@
+pip install opentelemetry-sdk
+pip install opentelemetry-exporter-otlp
+pip install opentelemetry-exporter-prometheus  # If using Prometheus
+pip install opentelemetry-instrumentation       # If using automatic instrumentation
+pip install opentelemetry-api
+pip install sybpydb  # If you're connecting to a Sybase database
+
+
+
+
 import logging
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
