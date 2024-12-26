@@ -3,6 +3,154 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.metrics import get_meter
+from lib.tracer import tracer_init
+from lib.logger import log
+import sybpydb
+import psutil
+import time
+
+# 1. Initialize Tracer
+tracer = tracer_init()
+
+# 2. Configure Metrics Exporter
+resource = Resource.create({"service.name": "test_python_app"})
+metric_exporter = OTLPMetricExporter(
+    endpoint="http://<collector_address>:5608",  # Replace with your OTLP collector endpoint
+    insecure=True,  # Set to False if using TLS
+)
+metric_reader = PeriodicExportingMetricReader(exporter=metric_exporter, export_interval_millis=5000)
+meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+meter = get_meter("test_python_app", meter_provider=meter_provider)
+
+# 3. Define Metrics
+cpu_usage = meter.create_observable_gauge(
+    "app.cpu.usage",
+    callbacks=[
+        lambda observer: observer.observe(psutil.cpu_percent(), {"metric_type": "cpu_usage"})
+    ],
+    description="CPU usage of the application",
+)
+
+memory_usage = meter.create_observable_gauge(
+    "app.memory.usage",
+    callbacks=[
+        lambda observer: observer.observe(psutil.virtual_memory().percent, {"metric_type": "memory_usage"})
+    ],
+    description="Memory usage of the application",
+)
+
+disk_usage = meter.create_observable_gauge(
+    "app.disk.usage",
+    callbacks=[
+        lambda observer: observer.observe(psutil.disk_usage('/').percent, {"metric_type": "disk_usage"})
+    ],
+    description="Disk usage of the application",
+)
+
+process_count = meter.create_observable_gauge(
+    "app.process.count",
+    callbacks=[
+        lambda observer: observer.observe(len(psutil.pids()), {"metric_type": "process_count"})
+    ],
+    description="Number of processes running on the system",
+)
+
+db_query_duration = meter.create_histogram(
+    "app.db.query.duration",
+    description="Time taken to execute a database query",
+)
+
+db_connection_status = meter.create_observable_gauge(
+    "app.db.connection.status",
+    callbacks=[
+        lambda observer: observer.observe(1, {"status": "up"})  # 1 = Up, 0 = Down
+    ],
+    description="Database connection status (1 for up, 0 for down)",
+)
+
+user_logged_in = meter.create_counter(
+    "app.db.user.logged_in",
+    description="Number of times a user connects to the database",
+)
+
+# 4. Function to Connect to Sybase and Run a Query
+def query_sybase():
+    with tracer.start_as_current_span("sybase-query", attributes={"db.system": "sybase"}):
+        try:
+            start_time = time.time()
+            
+            # Establish connection
+            connection = sybpydb.connect(servername="your_server_name", database="your_database_name")
+            user_id = connection.getuser()  # Get the user ID
+            log.info(f"Connected to Sybase database as user: {user_id}")
+            user_logged_in.add(1, {"user_id": user_id})
+
+            # Execute a query
+            query = "SELECT COUNT(*) FROM your_table_name"  # Replace with your actual query
+            cursor = connection.cursor()
+            cursor.execute(query)
+            result = cursor.fetchone()
+            log.info(f"Query result: {result[0]}")
+
+            # Record query duration
+            duration = time.time() - start_time
+            db_query_duration.record(duration, {"query": "SELECT COUNT(*)"})
+            log.info(f"Query executed in {duration:.2f} seconds")
+
+            cursor.close()
+            connection.close()
+
+        except Exception as e:
+            log.error(f"Failed to execute query: {e}")
+            # Update connection status to down in case of error
+            db_connection_status.observe(0, {"status": "down"})
+
+# 5. Function to Check App Status
+def check_app_status():
+    try:
+        log.info("Performing app health check")
+        # Simulate a health check by checking database connection
+        connection = sybpydb.connect(servername="your_server_name", database="your_database_name")
+        connection.close()
+        log.info("App is up and running")
+        return 1  # App is up
+    except Exception as e:
+        log.error(f"App health check failed: {e}")
+        return 0  # App is down
+
+# Update the app status metric
+app_status = meter.create_observable_gauge(
+    "app.status",
+    callbacks=[
+        lambda observer: observer.observe(check_app_status(), {"service": "test_python_app"})
+    ],
+    description="Application status (1 for up, 0 for down)",
+)
+
+# 6. Main Application Logic
+def main():
+    with tracer.start_as_current_span("main-operation", attributes={"operation": "demo"}):
+        log.info("Starting the main operation")
+        query_sybase()  # Call the function to run the Sybase query
+        log.info("Main operation completed successfully")
+
+# 7. Run Application Loop
+if __name__ == "__main__":
+    log.info("Starting Python application with OpenTelemetry metrics and tracing")
+    while True:
+        try:
+            main()
+        except Exception as e:
+            log.error(f"An error occurred in the main loop: {e}")
+        time.sleep(5)
+
+
+------------
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.metrics import get_meter
 from lib.tracer import tracer_init  # Assuming you have tracer_init in lib.tracer
 from lib.logger import log  # Assuming you have log setup in lib.logger
 import sybpydb
