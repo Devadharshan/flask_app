@@ -1,3 +1,82 @@
+pip install opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-api
+
+
+from opentelemetry.exporter.otlp.trace import OTLPTraceExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+# Initialize TracerProvider
+tracer_provider = TracerProvider()
+trace_exporter = OTLPTraceExporter(endpoint="http://<collector_address>:5608")
+span_processor = BatchSpanProcessor(trace_exporter)
+tracer_provider.add_span_processor(span_processor)
+
+import logging
+from opentelemetry import metrics
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.exporter.otlp.metrics import OTLPMetricExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.exporter.otlp.trace import OTLPTraceExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+import time
+import random
+
+# Set up logging
+log = logging.getLogger('otel-metrics-debug')
+log.setLevel(logging.DEBUG)  # Adjust to INFO or ERROR in production if needed
+ch = logging.StreamHandler()  # Log to console
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+log.addHandler(ch)
+
+# Initialize OpenTelemetry TracerProvider
+log.info("Initializing TracerProvider...")
+tracer_provider = TracerProvider(
+    resource=Resource.create({SERVICE_NAME: "test_python_app"})
+)
+trace_exporter = OTLPTraceExporter(endpoint="http://<collector_address>:5608")
+span_processor = BatchSpanProcessor(trace_exporter)
+tracer_provider.add_span_processor(span_processor)
+
+# Initialize OpenTelemetry MeterProvider and OTLP Metrics Exporter
+log.info("Initializing MeterProvider...")
+meter_provider = MeterProvider(resource=Resource.create({SERVICE_NAME: "test_python_app"}))
+
+# Initialize OTLP Metric Exporter (this sends metrics to the collector)
+log.info("Initializing OTLP Metric Exporter...")
+otlp_metric_exporter = OTLPMetricExporter(endpoint="http://<collector_address>:5608", insecure=True)
+
+# Use PeriodicExportingMetricReader to periodically export metrics to the OTLP exporter
+reader = PeriodicExportingMetricReader(otlp_metric_exporter, export_interval_millis=5000)  # Exports every 5 seconds
+meter_provider.add_metric_reader(reader)
+
+# Set up the meter for creating metrics
+meter = meter_provider.get_meter("test_python_app")
+
+# Create some sample metrics (e.g., CPU and Memory usage)
+cpu_usage = meter.create_gauge("app_cpu_usage", description="CPU usage of the application")
+memory_usage = meter.create_gauge("app_memory_usage", description="Memory usage of the application")
+
+# Simulate updating metrics every 5 seconds
+log.info("Starting to simulate metric updates...")
+try:
+    while True:
+        cpu_val = random.uniform(0, 100)  # Random CPU usage between 0 and 100
+        memory_val = random.uniform(0, 16)  # Random memory usage between 0 and 16 GB
+        cpu_usage.add(cpu_val, labels={"app_name": "test_python_app"})
+        memory_usage.add(memory_val, labels={"app_name": "test_python_app"})
+        
+        log.debug(f"Updated metrics - CPU Usage: {cpu_val}, Memory Usage: {memory_val}")
+        
+        time.sleep(5)  # Wait for 5 seconds before updating again
+
+except KeyboardInterrupt:
+    log.info("Metric simulation stopped by user.")
+
+
+----===
 pip install opentelemetry-sdk
 pip install opentelemetry-exporter-otlp
 pip install opentelemetry-exporter-prometheus  # If using Prometheus
