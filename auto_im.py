@@ -1,4 +1,79 @@
-pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-exporter-otlp-proto-grpc opentelemetry-instrumentation
+
+from opentelemetry import metrics, trace
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.exporter.otlp.proto.grpc.metrics_exporter import OTLPMetricExporter
+from opentelemetry.sdk.resources import Resource
+import psutil  # For system metrics like CPU and memory usage
+
+# Define OTLP endpoint
+OTLP_ENDPOINT = "http://<collector_address>:5608"
+
+# Create resource for identifying the service
+resource = Resource.create({"service.name": "test_python_app"})
+
+# Initialize Metric Exporter and Provider
+metric_exporter = OTLPMetricExporter(endpoint=OTLP_ENDPOINT, insecure=True)
+metric_reader = PeriodicExportingMetricReader(metric_exporter)
+meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+
+# Set the MeterProvider globally
+metrics.set_meter_provider(meter_provider)
+
+# Create a meter for custom metrics
+meter = metrics.get_meter("test_python_app", version="1.0.0")
+
+# Metric: Database query duration
+db_query_duration = meter.create_histogram(
+    name="app_db_query_duration",
+    description="Database query duration",
+    unit="ms",
+)
+
+# Metric: CPU usage
+cpu_usage_gauge = meter.create_observable_gauge(
+    name="app_cpu_usage",
+    description="Current CPU usage percentage",
+    unit="%",
+    callbacks=[lambda: [psutil.cpu_percent(interval=None)]],  # Correct callback
+)
+
+# Metric: Memory usage
+memory_usage_gauge = meter.create_observable_gauge(
+    name="app_memory_usage",
+    description="Current memory usage percentage",
+    unit="%",
+    callbacks=[lambda: [psutil.virtual_memory().percent]],  # Correct callback
+)
+
+# Metric: Application status (up/down)
+def app_status_callback():
+    # 1 for up, 0 for down
+    return [1]
+
+app_status_gauge = meter.create_observable_gauge(
+    name="app_status",
+    description="Application status (1 for up, 0 for down)",
+    unit="",
+    callbacks=[app_status_callback],
+)
+
+# Simulated function to measure query duration (example)
+import time
+def execute_query():
+    start_time = time.time()
+    time.sleep(0.2)  # Simulate a query delay
+    duration = (time.time() - start_time) * 1000  # Duration in milliseconds
+    db_query_duration.record(duration)
+
+# Simulate queries
+if __name__ == "__main__":
+    while True:
+        execute_query()
+        time.sleep(5)  # Interval between metrics collection
+
+
+----\\\\pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-exporter-otlp-proto-grpc opentelemetry-instrumentation
 
 
 from opentelemetry import trace, metrics
