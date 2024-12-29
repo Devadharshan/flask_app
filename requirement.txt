@@ -1,0 +1,12 @@
+pip install opentelemetry-instrumentation
+pip install opentelemetry-exporter-otlp
+pip install opentelemetry-sdk
+pip install opentelemetry-instrumentation-psutil
+pip install opentelemetry-instrumentation-sybpydb
+
+
+opentelemetry-instrument \
+    --traces_exporter otlp \
+    --metrics_exporter otlp \
+    --exporter_otlp_endpoint http://<collector_address>:5608 \
+    python app.py
