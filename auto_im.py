@@ -1,3 +1,6 @@
+pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-exporter-otlp-proto-grpc opentelemetry-instrumentation
+
+
 from opentelemetry import trace, metrics
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
