@@ -1,73 +1,107 @@
-import time
 import os
-from opentelemetry import metrics
+import time
+import resource  # For memory usage
+from opentelemetry import metrics, trace
 from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import OTLPMetricExporter, PeriodicExportingMetricReader
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.grpc.metrics_exporter import OTLPMetricExporter
 
-# Import logger and tracer from the lib folder
-from lib.logger import log
-from lib.tracer import tracer
+# Import custom logger and tracer from your `lib` folder
+from lib.logger import Logger
+from lib.tracer import Tracer
 
-# Configure Metrics
-metric_exporter = OTLPMetricExporter(endpoint="your-otel-collector-endpoint:4317", insecure=True)
-metric_reader = PeriodicExportingMetricReader(exporter=metric_exporter, export_interval_millis=5000)
-meter_provider = MeterProvider(metric_readers=[metric_reader])
-metrics.set_meter_provider(meter_provider)
-meter = metrics.get_meter("test_python_app")
+# Configuration
+SYBASE_SERVER = "your_server_name"
+SYBASE_DATABASE = "your_database_name"
+SYBASE_CONNECTION_STRING = f"server name={SYBASE_SERVER};database={SYBASE_DATABASE};chainxacts=0"
+OTEL_COLLECTOR_ENDPOINT = "http://your-otel-collector-endpoint:4317"
 
-# Fixed Observable Gauges
-def collect_cpu_usage():
+# OpenTelemetry setup
+def setup_otel():
+    # Trace setup
+    tracer_provider = TracerProvider()
+    span_processor = BatchSpanProcessor(
+        OTLPSpanExporter(endpoint=OTEL_COLLECTOR_ENDPOINT, insecure=True)
+    )
+    tracer_provider.add_span_processor(span_processor)
+    trace.set_tracer_provider(tracer_provider)
+
+    # Metrics setup
+    meter_provider = MeterProvider(
+        metric_readers=[
+            PeriodicExportingMetricReader(
+                OTLPMetricExporter(endpoint=OTEL_COLLECTOR_ENDPOINT, insecure=True)
+            )
+        ]
+    )
+    metrics.set_meter_provider(meter_provider)
+
+# Function to fetch CPU and memory usage
+def collect_system_metrics():
+    pid = os.getpid()  # Current process ID
+    # CPU usage (user + system time)
+    cpu_usage = os.times().user + os.times().system
+    # Memory usage in MB
+    memory_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    return cpu_usage, memory_usage
+
+# Function to fetch data from the Sybase database
+def fetch_data():
     try:
-        # Simulate CPU usage percentage
-        cpu_usage = os.getloadavg()[0] * 10  # Example logic; replace with actual CPU metrics
-        return [(cpu_usage, {})]
-    except Exception as e:
-        log.error(f"Failed to collect CPU usage: {e}")
-        return []
+        Logger.log_info("Connecting to Sybase database...")
+        connection = sybpydb.connect(SYBASE_CONNECTION_STRING)
+        cursor = connection.cursor()
+        query = "SELECT TOP 10 * FROM your_table_name"  # Replace with your actual query
 
-def collect_memory_usage():
-    try:
-        # Simulate memory usage in MB
-        memory_usage = 512  # Replace with actual memory usage logic
-        return [(memory_usage, {})]
-    except Exception as e:
-        log.error(f"Failed to collect Memory usage: {e}")
-        return []
-
-cpu_usage_gauge = meter.create_observable_gauge(
-    name="app_cpu_usage",
-    description="CPU usage of the application",
-    callback=collect_cpu_usage,
-)
-
-memory_usage_gauge = meter.create_observable_gauge(
-    name="app_memory_usage",
-    description="Memory usage of the application",
-    callback=collect_memory_usage,
-)
-
-# Example Histogram for DB Query Duration
-query_duration_histogram = meter.create_histogram(
-    name="app_db_query_duration",
-    unit="seconds",
-    description="Duration of database queries",
-)
-
-# Main Application Logic
-def execute_database_query():
-    with tracer.start_as_current_span("execute_database_query"):
-        log.info("Executing database query...")
         start_time = time.time()
-        time.sleep(1.5)  # Simulating a query taking 1.5 seconds
-        duration = time.time() - start_time
-        query_duration_histogram.record(duration)
-        log.info(f"Database query completed in {duration:.2f} seconds")
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        query_duration = time.time() - start_time
 
+        Logger.log_info(f"Query executed successfully in {query_duration:.2f} seconds.")
+        Logger.log_info(f"Fetched {len(rows)} rows from the database.")
+        return rows, query_duration
+    except Exception as e:
+        Logger.log_error(f"Error during database query: {e}")
+        raise
+
+# Main function
 def main():
-    while True:
-        log.info("Application is running...")
-        execute_database_query()
-        time.sleep(10)
+    setup_otel()
+
+    tracer = Tracer.get_tracer("custom_tracer")  # Use your custom tracer implementation
+    meter = metrics.get_meter("custom_meter")
+
+    # Define custom metrics
+    db_query_duration_metric = meter.create_histogram(
+        name="db_query_duration_seconds",
+        description="Histogram of database query durations",
+        unit="seconds"
+    )
+    cpu_usage_metric = meter.create_observable_gauge(
+        name="app_cpu_usage_seconds",
+        description="CPU usage of the application in seconds",
+        unit="seconds",
+        callback=lambda: [(cpu_usage_metric, collect_system_metrics()[0])]
+    )
+    memory_usage_metric = meter.create_observable_gauge(
+        name="app_memory_usage_megabytes",
+        description="Memory usage of the application in MB",
+        unit="MB",
+        callback=lambda: [(memory_usage_metric, collect_system_metrics()[1])]
+    )
+
+    # Tracing and fetching data
+    with tracer.start_as_current_span("database_query"):
+        rows, query_duration = fetch_data()
+
+        # Record the query duration as a metric
+        db_query_duration_metric.record(query_duration)
+
+    Logger.log_info("Application execution completed successfully.")
 
 if __name__ == "__main__":
     main()
