@@ -1,3 +1,7 @@
+pip install opentelemetry-api opentelemetry-sdk opentelemetry-instrumentation
+pip install opentelemetry-instrumentation-psutil
+
+
 import subprocess
 import time
 import psutil  # For process and system-level metrics
