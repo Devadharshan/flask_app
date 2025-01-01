@@ -1,12 +1,13 @@
 import subprocess
 import time
+import psutil  # For process and system-level metrics
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
-from opentelemetry.instrumentation.auto_instrumentation import AutoInstrumentation
+from opentelemetry.instrumentation.psutil import PsutilInstrumentor  # For auto-instrumentation of system metrics
 
 # Initialize OpenTelemetry Tracer
 trace.set_tracer_provider(TracerProvider())
@@ -22,8 +23,8 @@ meter_provider = MeterProvider()
 reader = PeriodicExportingMetricReader(ConsoleMetricExporter(), export_interval_millis=10000)
 meter_provider.add_metric_reader(reader)
 
-# Auto-instrumentation (sets up process-level metrics collection automatically)
-AutoInstrumentation()
+# Auto-instrumentation for system-level metrics (CPU, memory, etc.)
+PsutilInstrumentor().instrument()
 
 def check_autosys_job_status(job_name):
     """Check the status of an Autosys job."""
