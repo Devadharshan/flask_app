@@ -1,0 +1,33 @@
+hy are the Metric Names Like This?
+Metric Prefix:
+OpenTelemetry uses a structured naming convention where each metric's name describes:
+The category or source of the metric (e.g., process, system).
+The type of data being measured (e.g., memory, cpu, disk).
+The runtime or instrumentation source (e.g., runtime_cpython for Python metrics).
+process_runtime_cpython_memory_bytes:
+process: Indicates this metric relates to your application process.
+runtime_cpython: Specifies that the data is from the Python runtime (CPython implementation).
+memory_bytes: Refers to memory usage in bytes.
+Exporter Adds Labels:
+Metrics are grouped by job names (e.g., sybase_app) and have associated labels (e.g., service.name="sybase_app").
+This structure allows Grafana to identify the source of the metrics.
+Common Metrics You May See
+Process-Level Metrics:
+
+process_runtime_cpython_memory_bytes:
+Memory used by your Python application process (Resident Set Size or RSS).
+process_runtime_cpython_cpu_time:
+CPU time consumed by the Python process.
+System-Level Metrics:
+
+system_cpu_utilization:
+Percentage of CPU usage across the system.
+system_memory_usage:
+Total memory usage (used/free memory in the system).
+system_network_io_bytes:
+Bytes sent and received by the network interface.
+Why Are These Metric Names Useful?
+The detailed and hierarchical naming convention ensures that:
+
+Metrics are self-explanatory and can be easily understood by anyone familiar with monitoring systems.
+Metrics are runtime-specific, allowing you to distinguish between different processes or runtimes (e.g., CPython for Python).
