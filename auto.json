@@ -1,0 +1,80 @@
+{
+  "dashboard": {
+    "title": "Sybase App Metrics Dashboard",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "CPU Usage",
+        "targets": [
+          {
+            "expr": "process_cpu_seconds_total{service_name=\"sybase_app\"}",
+            "legendFormat": "{{service_name}}",
+            "interval": ""
+          }
+        ],
+        "xaxis": {
+          "mode": "time"
+        },
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "CPU Seconds",
+            "logBase": 1
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "type": "graph",
+        "title": "Memory Usage",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{service_name=\"sybase_app\"}",
+            "legendFormat": "{{service_name}}",
+            "interval": ""
+          }
+        ],
+        "xaxis": {
+          "mode": "time"
+        },
+        "yaxes": [
+          {
+            "format": "bytes",
+            "label": "Memory Bytes",
+            "logBase": 1
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "type": "table",
+        "title": "Query Execution Metrics",
+        "targets": [
+          {
+            "expr": "sybase_query_execution_time_ms{service_name=\"sybase_app\"}",
+            "legendFormat": "{{query}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1,
+    "editable": true
+  }
+}
