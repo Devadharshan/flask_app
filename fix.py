@@ -2,9 +2,10 @@ import time
 import psutil
 from opentelemetry import metrics
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics import MeterProvider, ObservableGauge
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.sdk.metrics.measurement import Measurement
 
 # Setup OpenTelemetry resources and metric provider
 resource = Resource.create(attributes={"service.name": "sybase_app"})
@@ -17,17 +18,15 @@ metrics.set_meter_provider(meter_provider)
 meter = metrics.get_meter_provider().get_meter("sybase_app")
 
 # Define the callback functions
-def get_cpu_usage(_):
+def get_cpu_usage(observer):
     """Get CPU usage percentage."""
-    return [
-        (psutil.Process().cpu_percent(interval=None), {}),
-    ]
+    cpu_usage = psutil.Process().cpu_percent(interval=None)
+    observer.observe(cpu_usage)
 
-def get_memory_usage(_):
+def get_memory_usage(observer):
     """Get memory usage in bytes."""
-    return [
-        (psutil.Process().memory_info().rss, {}),
-    ]
+    memory_usage = psutil.Process().memory_info().rss
+    observer.observe(memory_usage)
 
 # Create Observable Metrics
 meter.create_observable_gauge(
