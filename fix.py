@@ -1,11 +1,10 @@
 import time
 import psutil
+from opentelemetry import metrics
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-from opentelemetry import metrics
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.metrics import ObservableGauge
 
 # Setup OpenTelemetry resources and metric provider
 resource = Resource.create(attributes={"service.name": "sybase_app"})
@@ -21,21 +20,13 @@ meter = metrics.get_meter_provider().get_meter("sybase_app")
 def get_cpu_usage(_):
     """Get CPU usage percentage."""
     return [
-        ObservableGauge(
-            name="process_cpu_usage_percent",
-            value=psutil.Process().cpu_percent(interval=None),
-            attributes={},
-        )
+        (psutil.Process().cpu_percent(interval=None), {}),
     ]
 
 def get_memory_usage(_):
     """Get memory usage in bytes."""
     return [
-        ObservableGauge(
-            name="process_memory_usage_bytes",
-            value=psutil.Process().memory_info().rss,  # Use current process' memory info (rss)
-            attributes={},
-        )
+        (psutil.Process().memory_info().rss, {}),
     ]
 
 # Create Observable Metrics
