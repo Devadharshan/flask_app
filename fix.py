@@ -1,3 +1,6 @@
+pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp psutil grpcio google-api-core
+
+
 import time
 import psutil
 from opentelemetry import metrics
